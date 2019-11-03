@@ -8,6 +8,7 @@ import io
 from sklearn.metrics import mean_squared_error as rms
 import numpy as np
 from statsmodels.tsa.arima_model import ARIMA
+import math
 
 
 def sarima(data,steps):
