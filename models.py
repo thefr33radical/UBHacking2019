@@ -55,7 +55,7 @@ class Models(object):
 
         rmse=math.sqrt(rms(actual_values,pred_values))
         print("RMSE VALUE : ",rmse)
-        return { "model":"Baseline","index":indexes, "actual":actual_values, "predicted":pred_values,"rmse":rmse}
+        return { "model":"Baseline","index":list(indexes), "actual":list(actual_values.values), "predicted":list(pred_values),"rmse":rmse}
          
     def uni_sarima(self,steps):
         return helper.sarima(self.uni_data,steps)
@@ -75,7 +75,7 @@ class Models(object):
 
 if __name__=="__main__":
     steps=10
-    obj=Models("\dataset\data_ub.csv")
+    obj=Models("\data\data_ub.csv")
     obj.uni_baseline(steps)
     #obj.uni_sarima(steps)
     
