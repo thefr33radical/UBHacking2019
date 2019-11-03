@@ -1,6 +1,7 @@
 import json
 import requests
 from datetime import datetime
+from urllib.parse import quote
 
 steps = 10
 class News(object):
@@ -22,10 +23,30 @@ class News(object):
 
         return response.json()
 
-if __name__ == "__main__":
-    # Initialize the news object
-    news = News()
+class Wiki(object):
+    def __init__(self):
+        pass
 
-    # Grab some news
-    results = news.get_news("apple")
-    print(results)
+    def get_wiki(self, keyword):
+        url = ('https://en.wikipedia.org/w/api.php?'
+               'action=query&'
+               'prop=extracts&'
+               'format=json&'
+               'exintro=&'
+               'titles=%s'
+               % (quote(keyword)))  # encode the URL
+
+        response = requests.get(url)
+
+        return response.json()
+
+if __name__ == "__main__":
+    # Initialize the feed objects
+    news = News()
+    wiki = Wiki()
+
+    # Grab some feeds
+    news_results = news.get_news("apple")
+    print(news_results)
+    wiki_results = wiki.get_wiki("nasdaq")
+    print(wiki_results)
