@@ -1,5 +1,4 @@
 
-from statsmodels.tsa.api import ExponentialSmoothing, SimpleExpSmoothing, Holt, SARIMAX
 import pandas as pd
 import datetime
 from matplotlib import pyplot as plt
@@ -7,108 +6,94 @@ import requests
 import io
 from sklearn.metrics import mean_squared_error as rms
 import numpy as np
-from statsmodels.tsa.arima_model import ARIMA
-import math
-from sklearn.preprocessing import MinMaxScaler
-from keras.models import Sequential
-from keras.layers import Dense
-from keras.layers import LSTM
+import math 
+import os
+import helper
 
-def sarima(data,steps):
-    model=SARIMAX(endog=data.values,order=(2,0,1),seasonal_order=(0,1,1,7),enforce_invertibility=False)
-    sarima_fit= model.fit()
-    print(sarima_fit.summary())
 
-    # Rollling Forecast
+present_dir=os.path.dirname(os.path.abspath(__file__))
+# XGboost regressor
+# Random Forest Regressor
+# LSTM
+# Conv LSTM
+
+# Interpretebility using lime
+
+class Models(object):
+    def __init__(self,path):        
+        data = pd.read_csv(present_dir+path, error_bad_lines=False,header=0, parse_dates=[1], index_col=0, squeeze=True)
+        data["Adj Close"] = data["Adj Close"].astype(float)
+        self.multi_data=data
+        data=data.loc[:,"Adj Close"]
+        data=data[:100]
+        self.uni_data=pd.Series(data)
         
-    # Number of days to Forecast Parameter
-    end =int(0.2*len(data))
-    values = data[:-end]
-    actual_values = data[len(data)-end:]
-    pred_values=[]
-    indexes=data[len(data)-end:].index
+    def ret_uni_data(self):        
+        plt.figure(num=None, figsize=(20, 2), dpi=100,facecolor='w', edgecolor='k')
+        plt.plot(self.uni_data.index,self.uni_data["Adj Close"],marker='*', color='maroon')
+        plt.show()        
 
-    for i in range(end):
-        model = ARIMA((values),(2, 0, 1))
-        arima_fit= model.fit()
+    def uni_baseline(self,steps):
+        pred_values=[]
+
+        end =int(0.2*len(self.uni_data))
+        values = self.uni_data[:-end]
+        actual_values = self.uni_data[len(self.uni_data)-end:]
+        pred_values=[]
+        indexes=self.uni_data[len(self.uni_data)-end:].index
+
+        for i in range(1,len(actual_values)):
+            pred_values.append(actual_values[i])
+            
+        pred_values.append(0)
         
-        fnext = arima_fit.forecast()[0][0] 
-        pred_values.append(fnext)
-        values = data[:-end+i]
+        """plt.figure(num=None, figsize=(20, 2), dpi=100,facecolor='w', edgecolor='k')
+        plt.xlabel('Time', fontsize=8)
+        plt.ylabel('Adjusted Stock ', fontsize=8)
+        plt.plot(actual_values,marker='.', color='pink')
+        plt.plot(pred_values,marker='.', color='purple')
+        plt.title("Adjusted Stocks ",fontsize=12)
+        plt.show()
+        """
 
-    pred_values=pd.Series(pred_values)
-    pred_values.index=indexes
+        rmse=math.sqrt(rms(actual_values,pred_values))
+        print("RMSE VALUE : ",rmse)
+        return { "model":"Baseline","index":list(indexes), "actual":list(actual_values.values), "predicted":list(pred_values),"rmse":rmse}
+         
+    def uni_sarima(self,steps):
+        return helper.sarima(self.uni_data,steps)
+        pass
 
-    #Doubt
-    #pred_values=pred_values.shift(-1)[:]
-    """
-    plt.figure(num=None, figsize=(10, 2), dpi=100,facecolor='w', edgecolor='k')
-    plt.xlabel('Time', fontsize=8)
-    plt.ylabel('Inpatients', fontsize=8)
-    plt.plot(actual_values,marker='.', color='pink')
-    plt.plot(pred_values,marker='.', color='purple')
-    plt.title("Inpatients Prediction Forecast",fontsize=12)
-    plt.show()
-    """
-    rmse=rms(actual_values,pred_values)
-    # Needs correction ??
-    print("RMSE VALUE",rmse)
-    #print(actual_values,pred_values)
-    print(len(pred_values))
-    return { "model":"Baseline","index":list(indexes), "actual":list(actual_values.values), "predicted":list(pred_values),"rmse":rmse}
+    def uni_arima_ann(self,steps):
+        pass
 
-def transform_supervised(dat,lag=1):
-    x=dat.shift(lag)
-    y=dat
-    return x,y  
+    def multi_elasticnet(self,steps):
+        pass
 
-def scale_data(df):
-    mx=MinMaxScaler()
-    df["x"]=mx.fit_transform(np.asarray(df["x"]).reshape(-1,1))
-    return mx,df  
+    def prophet(self,steps):
+        end =int(0.2*len(self.multi_data))
+        values = self.multi_data[:-end]
+        m= Prophet()
+        m.fit(values)
+        actual_values = self.uni_data[len(self.multi_data)-end:]
 
-def inverse_scale_data(mx,df):
-    df["x"]=mx.inverse_transform(np.asarray(df["x"]).reshape(-1,1))
-    return mx,df  
+        future = m.make_future_dataframe(periods=len(self.multi_data)-end)
+        forecast = m.predict(future)
+        print(forecast[self.multi_data.columns].tail())        
 
-def fit_lstm(df, batch_size, nb_epoch, neurons):
-  x, y = df.iloc[:,:-1], df.iloc[:, -1]
-  x = np.asarray(x).reshape(x.shape[0], 1, x.shape[1])
-  model = Sequential()
-  model.add(LSTM(neurons, batch_input_shape=(batch_size, x.shape[1], x.shape[2]), stateful=True))
-  model.add(Dense(1))
-  model.compile(loss='mean_squared_error', optimizer='adam')
-  for i in range(nb_epoch):
-    model.fit(x, y, epochs=1, batch_size=batch_size, verbose=0, shuffle=False)
-    model.reset_states()
-  return x,model
+    def lstm(self,steps):
+        return helper.lstm(self.uni_data,steps)
 
-def lstm(data,steps):
-    indexes=data.index
-    end =int(0.2*len(data))
-    train, test = data[0:-end], data[-end:]
+    def multi_cnn_lstm(self,steps):
+        pass
 
-    x,y=transform_supervised(train)
-
-    df = pd.concat([x,y],axis=1)
-    df.columns=["x","y"]
-    df.fillna(0,inplace=True)
-    mx,df=scale_data(df)
-
-    x,lstm_model = fit_lstm(df, 1, 5, 40)
-    # forecast the entire training dataset to build up state for forecasting
-    #train_reshaped = train_scaled[:, 0].reshape(len(train_scaled), 1, 1)
-    testx,testy=transform_supervised(test)
-
-    df1 = pd.concat([testx,testy],axis=1)
-    df1.columns=["x","y"]
-    df1.fillna(0,inplace=True)
-    mx1,df1=scale_data(df1)
-    testx, testy = df1.iloc[:,:-1], df1.iloc[:, -1]
-    testx = np.asarray(testx).reshape(testx.shape[0], 1, testx.shape[1])
-
-    pred_values = lstm_model.predict(testx, batch_size=1)
+if __name__=="__main__":
+    steps=10
+    obj=Models("\data\data_ub.csv")
+    #obj.uni_baseline(steps)
+    #obj.uni_sarima(steps)
+    #obj.prophet(steps)
+    obj.lstm(steps)
     
-    rmse=rms(testy,pred_values)
-    print("RMSE VALUE : ",rmse)
-    return { "model":"Baseline","index":indexes[-end:], "actual":testy, "predicted":pred_values,"rmse":rmse}
+
+    
